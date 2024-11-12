@@ -3,17 +3,20 @@
 -- Faster frame-back-step for mpv
 
 local mp = require('mp')
-local utils = require('mp.utils')
 
 function ffprobe()
-	local subprocess = utils.subprocess({args = {
-		'ffprobe',
-		'-v', '0',
-		'-of', 'compact=p=0',
-		'-select_streams', '0',
-		'-show_entries', 'stream=r_frame_rate',
-		mp.get_property('path')
-	}})
+	local subprocess = mp.command_native({
+		name = 'subprocess',
+		capture_stdout = true,
+		args = {
+			'ffprobe',
+			'-v', '0',
+			'-of', 'compact=p=0',
+			'-select_streams', '0',
+			'-show_entries', 'stream=r_frame_rate',
+			mp.get_property('path')
+		}
+	})
 	if subprocess.status == 0 then
 		local frames, seconds = subprocess.stdout:match('r_frame_rate=(%d+)/(%d+)')
 		return seconds / frames
@@ -37,12 +40,12 @@ function frame_step(event, direction)
 	end
 end
 
-function frame_seek(event, direction) -- different method of stepping frames
+function frame_seek(event, direction) -- different (worse) method of stepping frames
 	local frame_duration = ffprobe()
 	if direction ~= 'forward' then
 		frame_duration = frame_duration * -1
 	end
-	if event.event == 'down' then
+	if event.event == 'down' or event.event == 'repeat' then
 		mp.command('seek ' .. frame_duration .. ' exact')
 	elseif event.event == 'up' then
 		mp.set_property('pause', 'yes')
